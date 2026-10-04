@@ -6,21 +6,31 @@ run "setup" {
   }
 }
 
-run "resource_group" {
+run "create_agent" {
   command = apply
 
   variables {
-    location = "westus3"
-    name     = run.setup.resource_group_name
-  }
+    name      = "sre-agent-${run.setup.name_suffix}"
+    location  = run.setup.location
+    parent_id = run.setup.resource_group_id
 
-  assert {
-    condition     = output.name == var.name
-    error_message = "The name output must match the resource group name."
+    managed_identities = {
+      system_assigned = true
+    }
   }
 
   assert {
     condition     = output.resource_id == azapi_resource.this.id
-    error_message = "The resource ID output must match the resource group ID."
+    error_message = "The resource_id output must match the created agent ID."
+  }
+
+  assert {
+    condition     = output.name == var.name
+    error_message = "The name output must match the agent name."
+  }
+
+  assert {
+    condition     = azapi_resource.this.type == "Microsoft.App/agents@2026-01-01"
+    error_message = "The agent must be created with the expected API version."
   }
 }
