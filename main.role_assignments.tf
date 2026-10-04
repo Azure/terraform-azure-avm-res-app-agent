@@ -30,7 +30,7 @@ resource "azapi_resource" "role_assignments" {
   }
 
   lifecycle {
-    // principalType is server-resolved (User/ServicePrincipal/Group) when not specified; ignore to avoid drift.
+    # principalType is server-resolved (User/ServicePrincipal/Group) when not specified; ignore to avoid drift.
     ignore_changes = [body.properties.principalType]
   }
 }

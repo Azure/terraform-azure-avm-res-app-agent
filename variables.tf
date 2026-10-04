@@ -1,7 +1,3 @@
-// =====================================================
-// Required inputs
-// =====================================================
-
 variable "location" {
   type        = string
   description = "The Azure region where the SRE Agent will be deployed."
@@ -33,10 +29,6 @@ DESCRIPTION
     error_message = "`parent_id` must be a valid resource group resource ID."
   }
 }
-
-// =====================================================
-// SRE Agent configuration (Microsoft.App/agents schema)
-// =====================================================
 
 variable "action_configuration" {
   type = object({
@@ -139,10 +131,6 @@ variable "upgrade_channel" {
   description = "The upgrade channel of the agent. Possible values are `Preview` and `Stable`."
 }
 
-// =====================================================
-// Write-only secrets
-// =====================================================
-
 variable "connection_key" {
   type        = string
   ephemeral   = true
@@ -178,10 +166,6 @@ variable "connection_string_version" {
     error_message = "When `connection_string` is set, `connection_string_version` must also be set."
   }
 }
-
-// =====================================================
-// AVM interfaces
-// =====================================================
 
 variable "enable_telemetry" {
   type        = bool
