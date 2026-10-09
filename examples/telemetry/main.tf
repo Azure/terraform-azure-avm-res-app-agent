@@ -26,7 +26,7 @@ resource "random_string" "suffix" {
 # Supporting resource group for the SRE Agent (created with AzAPI per AVM rules).
 resource "azapi_resource" "resource_group" {
   type      = "Microsoft.Resources/resourceGroups@2024-11-01"
-  name      = "rg-avm-sre-agent-${random_string.suffix.result}"
+  name      = "rg-avm-sre-agent-telemetry-${random_string.suffix.result}"
   parent_id = "/subscriptions/${data.azapi_client_config.current.subscription_id}"
   location  = "centralindia"
 }
@@ -34,12 +34,19 @@ resource "azapi_resource" "resource_group" {
 module "sre_agent" {
   source = "../../"
 
-  location         = "centralindia"
-  name             = "sre-agent-${random_string.suffix.result}"
-  parent_id        = azapi_resource.resource_group.id
-  enable_telemetry = false
+  location  = "centralindia"
+  name      = "sre-agent-${random_string.suffix.result}"
+  parent_id = azapi_resource.resource_group.id
+
+  # Telemetry is explicitly enabled (this is also the module default).
+  enable_telemetry = true
 
   managed_identities = {
     system_assigned = true
+  }
+
+  tags = {
+    environment = "example"
+    scenario    = "telemetry"
   }
 }
