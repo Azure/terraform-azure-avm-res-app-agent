@@ -2,40 +2,23 @@ data "azapi_client_config" "telemetry" {
   count = var.enable_telemetry ? 1 : 0
 }
 
+data "modtm_module_source" "telemetry" {
+  count = var.enable_telemetry ? 1 : 0
+
+  module_path = path.module
+}
+
 locals {
+  # If your module does not support a location, then set this local to "unknown"
+  # If the location is sourced from a collection or other value, then you can update this local to set it to the location
   main_location = var.location
 }
 
-locals {
-  avm_telemetry_modules       = fileexists(local.avm_telemetry_manifest_path) ? jsondecode(file(local.avm_telemetry_manifest_path)).Modules : []
-  avm_telemetry_module_entry  = try(one([for module in local.avm_telemetry_modules : module if module.Dir == path.module]), null)
-  avm_module_version          = try(local.avm_telemetry_module_entry.Version, "")
-  avm_module_source           = try(local.avm_telemetry_module_entry.Source, "")
-  avm_metadata                = jsondecode(file("${path.module}/metadata.json"))
-  avm_telemetry_manifest_path = "${path.root}/.terraform/modules/modules.json"
+resource "random_uuid" "telemetry" {
+  count = var.enable_telemetry ? 1 : 0
 }
 
-locals {
-  avm_module_source_type = (
-    can(regex("^registry[.]terraform[.]io/", local.avm_module_source)) ? "t" :
-    can(regex("^registry[.]opentofu[.]org/", local.avm_module_source)) ? "o" :
-    can(regex("^git::", local.avm_module_source)) ? "g" :
-    "x"
-  )
-}
-
-locals {
-  avm_telemetry_version_token = replace(coalesce(local.avm_module_version, "0.0.0"), ".", "-")
-}
-
-removed {
-  from = random_uuid.telemetry
-  lifecycle {
-    destroy = false
-  }
-}
-
-resource "terraform_data" "telemetry" {
+resource "modtm_telemetry" "telemetry" {
   count = var.enable_telemetry ? 1 : 0
 }
 
@@ -82,4 +65,34 @@ resource "azapi_resource" "telemetry" {
       condition     = length(local.avm_metadata.telemetryIdPrefix) + length(local.avm_telemetry_version_token) + 8 <= 64 && can(regex("^[A-Za-z0-9_-]+$", local.avm_telemetry_version_token))
     }
   }
+}
+
+locals {
+  avm_azapi_headers = !var.enable_telemetry ? {} : (local.fork_avm ? {
+    fork_avm  = "true"
+    random_id = one(random_uuid.telemetry).result
+    } : {
+    avm                = "true"
+    random_id          = one(random_uuid.telemetry).result
+    avm_module_source  = one(data.modtm_module_source.telemetry).module_source
+    avm_module_version = one(data.modtm_module_source.telemetry).module_version
+  })
+}
+
+locals {
+  fork_avm = !anytrue([for r in local.valid_module_source_regex : can(regex(r, one(data.modtm_module_source.telemetry).module_source))])
+}
+
+locals {
+  valid_module_source_regex = [
+    "registry.terraform.io/[A|a]zure/.+",
+    "registry.opentofu.io/[A|a]zure/.+",
+    "git::https://github\\.com/[A|a]zure/.+",
+    "git::ssh:://git@github\\.com/[A|a]zure/.+",
+  ]
+}
+
+locals {
+  # tflint-ignore: terraform_unused_declarations
+  avm_azapi_header = join(" ", [for k, v in local.avm_azapi_headers : "${k}=${v}"])
 }
