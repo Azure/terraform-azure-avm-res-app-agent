@@ -6,24 +6,48 @@ This deploys the module in its simplest form.
 
 ```hcl
 terraform {
-  required_version = ">= 1.9, < 2.0"
+  required_version = ">= 1.11, < 2.0"
 
   required_providers {
     azapi = {
       source  = "Azure/azapi"
       version = "~> 2.12"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.5"
+    }
   }
 }
 
 provider "azapi" {}
 
-module "resource_group" {
+data "azapi_client_config" "current" {}
+
+resource "random_string" "suffix" {
+  length  = 6
+  special = false
+  upper   = false
+}
+
+# Supporting resource group for the SRE Agent (created with AzAPI per AVM rules).
+resource "azapi_resource" "resource_group" {
+  location  = "centralindia"
+  name      = "rg-avm-sre-agent-${random_string.suffix.result}"
+  parent_id = "/subscriptions/${data.azapi_client_config.current.subscription_id}"
+  type      = "Microsoft.Resources/resourceGroups@2024-11-01"
+}
+
+module "sre_agent" {
   source = "../../"
 
-  location         = "westus3"
-  name             = "rg-avm-template-example"
+  location         = "centralindia"
+  name             = "sre-agent-${random_string.suffix.result}"
+  parent_id        = azapi_resource.resource_group.id
   enable_telemetry = var.enable_telemetry
+  managed_identities = {
+    system_assigned = true
+  }
 }
 ```
 
@@ -32,13 +56,19 @@ module "resource_group" {
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9, < 2.0)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.11, < 2.0)
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
+- <a name="requirement_random"></a> [random](#requirement\_random) (~> 3.5)
+
 ## Resources
 
-No resources.
+The following resources are used by this module:
+
+- [azapi_resource.resource_group](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [random_string.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) (resource)
+- [azapi_client_config.current](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs
@@ -67,7 +97,7 @@ No outputs.
 
 The following Modules are called:
 
-### <a name="module_resource_group"></a> [resource\_group](#module\_resource\_group)
+### <a name="module_sre_agent"></a> [sre\_agent](#module\_sre\_agent)
 
 Source: ../../
 
