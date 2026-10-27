@@ -15,12 +15,6 @@ terraform {
 
 provider "azapi" {}
 
-variable "location" {
-  type        = string
-  default     = "centralindia"
-  description = "The Azure region used for the integration test resource group."
-}
-
 data "azapi_client_config" "current" {}
 
 resource "random_string" "suffix" {

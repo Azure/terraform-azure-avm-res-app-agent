@@ -36,11 +36,8 @@ resource "azapi_resource" "this" {
       upgradeChannel = var.upgrade_channel
     }
   }
-  create_headers       = var.enable_telemetry ? { "User-Agent" = local.avm_azapi_header } : null
-  delete_headers       = var.enable_telemetry ? { "User-Agent" = local.avm_azapi_header } : null
   ignore_body_changes  = length(var.ignore_body_changes.app_agents) > 0 ? var.ignore_body_changes.app_agents : null
   ignore_null_property = true
-  read_headers         = var.enable_telemetry ? { "User-Agent" = local.avm_azapi_header } : null
   response_export_values = [
     "identity.principalId",
     "identity.tenantId",
@@ -65,8 +62,7 @@ resource "azapi_resource" "this" {
     "properties.incidentManagementConfiguration.connectionKey"                      = var.connection_key_version
     "properties.logConfiguration.applicationInsightsConfiguration.connectionString" = var.connection_string_version
   }
-  tags           = var.tags
-  update_headers = var.enable_telemetry ? { "User-Agent" = local.avm_azapi_header } : null
+  tags = var.tags
 
   dynamic "identity" {
     for_each = var.managed_identities.system_assigned || length(var.managed_identities.user_assigned_resource_ids) > 0 ? [var.managed_identities] : []

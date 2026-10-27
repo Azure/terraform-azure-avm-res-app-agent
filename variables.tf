@@ -17,12 +17,12 @@ variable "name" {
 
 variable "parent_id" {
   type        = string
-  nullable    = false
   description = <<DESCRIPTION
 The fully-qualified ARM resource ID of the resource group into which the SRE Agent will be deployed, for example `/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg`.
 
 This module does not create the parent scope. The consumer is responsible for providing an existing resource group ID.
 DESCRIPTION
+  nullable    = false
 
   validation {
     condition     = can(provider::azapi::parse_resource_id("Microsoft.Resources/resourceGroups", var.parent_id))
@@ -64,6 +64,42 @@ variable "agent_space_id" {
   description = "The agent space ID referenced by the agent."
 }
 
+variable "connection_key" {
+  type        = string
+  default     = null
+  description = "The key for the incident management connection. Supplied as a write-only value so it is never persisted in state."
+  ephemeral   = true
+}
+
+variable "connection_key_version" {
+  type        = number
+  default     = null
+  description = "Version tracker for `connection_key`. Increment to force the secret to be re-sent to Azure."
+
+  validation {
+    condition     = var.connection_key == null || var.connection_key_version != null
+    error_message = "When `connection_key` is set, `connection_key_version` must also be set."
+  }
+}
+
+variable "connection_string" {
+  type        = string
+  default     = null
+  description = "The connection string for the Application Insights resource. Supplied as a write-only value so it is never persisted in state."
+  ephemeral   = true
+}
+
+variable "connection_string_version" {
+  type        = number
+  default     = null
+  description = "Version tracker for `connection_string`. Increment to force the secret to be re-sent to Azure."
+
+  validation {
+    condition     = var.connection_string == null || var.connection_string_version != null
+    error_message = "When `connection_string` is set, `connection_string_version` must also be set."
+  }
+}
+
 variable "default_model" {
   type = object({
     name     = optional(string)
@@ -76,6 +112,30 @@ Default AI model configuration for the agent.
 - `name` - Model name (e.g., gpt-5, claude-opus-4-5, claude-sonnet-4-5).
 - `provider` - AI provider name (e.g., MicrosoftFoundry, Anthropic).
 DESCRIPTION
+}
+
+variable "enable_telemetry" {
+  type        = bool
+  default     = true
+  description = <<DESCRIPTION
+This variable controls whether or not telemetry is enabled for the module.
+For more information see <https://aka.ms/avm/telemetryinfo>.
+If it is set to false, then no telemetry will be collected.
+DESCRIPTION
+  nullable    = false
+}
+
+variable "ignore_body_changes" {
+  type = object({
+    app_agents = optional(list(string), [])
+  })
+  default     = {}
+  description = <<DESCRIPTION
+A set of `body` paths whose changes should be ignored, keyed by the module's AzAPI resource. Paths use dot notation (for example `properties.upgradeChannel`). Changes take effect only after an apply because the value is stored in provider-private state.
+
+- `app_agents` - Paths to ignore on the `Microsoft.App/agents` resource.
+DESCRIPTION
+  nullable    = false
 }
 
 variable "incident_management_configuration" {
@@ -125,85 +185,19 @@ Log configuration. The secret Application Insights `connection_string` is suppli
 DESCRIPTION
 }
 
-variable "upgrade_channel" {
-  type        = string
-  default     = null
-  description = "The upgrade channel of the agent. Possible values are `Preview` and `Stable`."
-}
-
-variable "connection_key" {
-  type        = string
-  ephemeral   = true
-  default     = null
-  description = "The key for the incident management connection. Supplied as a write-only value so it is never persisted in state."
-}
-
-variable "connection_key_version" {
-  type        = number
-  default     = null
-  description = "Version tracker for `connection_key`. Increment to force the secret to be re-sent to Azure."
-
-  validation {
-    condition     = var.connection_key == null || var.connection_key_version != null
-    error_message = "When `connection_key` is set, `connection_key_version` must also be set."
-  }
-}
-
-variable "connection_string" {
-  type        = string
-  ephemeral   = true
-  default     = null
-  description = "The connection string for the Application Insights resource. Supplied as a write-only value so it is never persisted in state."
-}
-
-variable "connection_string_version" {
-  type        = number
-  default     = null
-  description = "Version tracker for `connection_string`. Increment to force the secret to be re-sent to Azure."
-
-  validation {
-    condition     = var.connection_string == null || var.connection_string_version != null
-    error_message = "When `connection_string` is set, `connection_string_version` must also be set."
-  }
-}
-
-variable "enable_telemetry" {
-  type        = bool
-  default     = true
-  description = <<DESCRIPTION
-This variable controls whether or not telemetry is enabled for the module.
-For more information see <https://aka.ms/avm/telemetryinfo>.
-If it is set to false, then no telemetry will be collected.
-DESCRIPTION
-  nullable    = false
-}
-
-variable "ignore_body_changes" {
-  type = object({
-    app_agents = optional(list(string), [])
-  })
-  default     = {}
-  nullable    = false
-  description = <<DESCRIPTION
-A set of `body` paths whose changes should be ignored, keyed by the module's AzAPI resource. Paths use dot notation (for example `properties.upgradeChannel`). Changes take effect only after an apply because the value is stored in provider-private state.
-
-- `app_agents` - Paths to ignore on the `Microsoft.App/agents` resource.
-DESCRIPTION
-}
-
 variable "managed_identities" {
   type = object({
     system_assigned            = optional(bool, false)
     user_assigned_resource_ids = optional(set(string), [])
   })
   default     = {}
-  nullable    = false
   description = <<DESCRIPTION
 Controls the Managed Identity configuration on this resource.
 
 - `system_assigned` - (Optional) Specifies if the System Assigned Managed Identity should be enabled.
 - `user_assigned_resource_ids` - (Optional) Specifies a list of User Assigned Managed Identity resource IDs to be assigned to this resource.
 DESCRIPTION
+  nullable    = false
 }
 
 variable "resource_types" {
@@ -212,13 +206,13 @@ variable "resource_types" {
     authorization_locks = optional(string, "Microsoft.Authorization/locks@2020-05-01")
   })
   default     = {}
-  nullable    = false
   description = <<DESCRIPTION
 The AzAPI resource type (including API version) for each resource the module manages. Override to target a specific API version or a sovereign cloud.
 
 - `app_agents` - The resource type for the SRE Agent. Defaults to `Microsoft.App/agents@2026-01-01`.
 - `authorization_locks` - The resource type for the management lock. Defaults to `Microsoft.Authorization/locks@2020-05-01`.
 DESCRIPTION
+  nullable    = false
 }
 
 variable "retry" {
@@ -259,4 +253,10 @@ Per-operation timeouts applied to the AzAPI resource. Defaults to `null` (provid
 - `update` - (Optional) Timeout for update operations.
 - `delete` - (Optional) Timeout for delete operations.
 DESCRIPTION
+}
+
+variable "upgrade_channel" {
+  type        = string
+  default     = null
+  description = "The upgrade channel of the agent. Possible values are `Preview` and `Stable`."
 }

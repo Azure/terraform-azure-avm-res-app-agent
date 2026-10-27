@@ -1,7 +1,8 @@
 module "role_assignments_interface" {
   source  = "Azure/avm-utl-interfaces/azure"
-  version = "0.7.0"
+  version = "0.9.0"
 
+  location                                  = var.location
   enable_telemetry                          = false
   role_assignment_definition_lookup_enabled = var.role_assignment_definition_lookup_enabled
   role_assignment_definition_scope          = coalesce(var.role_assignment_definition_scope, azapi_resource.this.id)

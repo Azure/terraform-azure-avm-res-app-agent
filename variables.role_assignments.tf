@@ -1,10 +1,10 @@
 variable "role_assignment_definition_lookup_enabled" {
   type        = bool
   default     = true
-  nullable    = false
   description = <<DESCRIPTION
 Controls whether role definitions are looked up by name when creating role assignments. When disabled, every role assignment must supply `role_definition_id_or_name` as a full role definition resource ID.
 DESCRIPTION
+  nullable    = false
 }
 
 variable "role_assignment_definition_scope" {
@@ -26,7 +26,6 @@ variable "role_assignments" {
     principal_type                         = optional(string, null)
   }))
   default     = {}
-  nullable    = false
   description = <<DESCRIPTION
 A map of role assignments to create on the SRE Agent. The map key is deliberately arbitrary to avoid issues where map keys may be unknown at plan time.
 
@@ -40,4 +39,5 @@ A map of role assignments to create on the SRE Agent. The map key is deliberatel
 - `delegated_managed_identity_resource_id` - (Optional) The delegated Azure Resource ID which contains a Managed Identity. Used in cross-tenant scenarios.
 - `principal_type` - (Optional) The type of the `principal_id`. Possible values are `User`, `Group`, and `ServicePrincipal`.
 DESCRIPTION
+  nullable    = false
 }

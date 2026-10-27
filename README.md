@@ -4,12 +4,23 @@
 
 This minimal AzAPI module template creates one Azure resource group.
 
+## Telemetry
+
+Telemetry is enabled by default. It creates an empty, incremental Azure deployment at the active subscription
+scope using the module's `location`. The deployment identity needs `Microsoft.Resources/deployments/read`,
+`Microsoft.Resources/deployments/write`, and `Microsoft.Resources/deployments/delete` permissions at that scope.
+Telemetry deployment failures fail the apply. Set `enable_telemetry = false` to disable collection.
+
+When upgrading from legacy telemetry, declarative `removed` blocks forget the old telemetry objects without
+destroying them. Existing state may require the old `Azure/modtm` and `hashicorp/random` providers for one
+final initialization. The root module no longer declares those telemetry-only provider requirements.
+
 <!-- markdownlint-disable MD033 -->
 ## Requirements
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9, < 2.0)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.11, < 2.0)
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
@@ -17,6 +28,8 @@ The following requirements are needed by this module:
 
 The following resources are used by this module:
 
+- [azapi_resource.lock](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.role_assignments](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [azapi_resource.telemetry](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [azapi_resource.this](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [terraform_data.telemetry](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
@@ -29,19 +42,121 @@ The following input variables are required:
 
 ### <a name="input_location"></a> [location](#input\_location)
 
-Description: The Azure region where the resource group will be created.
+Description: The Azure region where the SRE Agent will be deployed.
 
 Type: `string`
 
 ### <a name="input_name"></a> [name](#input\_name)
 
-Description: The name of the resource group.
+Description: The name of the SRE Agent.
+
+Type: `string`
+
+### <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id)
+
+Description: The fully-qualified ARM resource ID of the resource group into which the SRE Agent will be deployed, for example `/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg`.
+
+This module does not create the parent scope. The consumer is responsible for providing an existing resource group ID.
 
 Type: `string`
 
 ## Optional Inputs
 
 The following input variables are optional (have default values):
+
+### <a name="input_action_configuration"></a> [action\_configuration](#input\_action\_configuration)
+
+Description: Configuration for action.
+
+- `access_level` - The access level of the action. Possible values are `High` and `Low`.
+- `identity` - The identity used by the action.
+- `mode` - The mode of the action. Possible values are `Autonomous`, `ReadOnly`, and `Review`.
+
+Type:
+
+```hcl
+object({
+    access_level = optional(string)
+    identity     = optional(string)
+    mode         = optional(string)
+  })
+```
+
+Default: `null`
+
+### <a name="input_agent_identity"></a> [agent\_identity](#input\_agent\_identity)
+
+Description: Agent identity configuration for accessing resources.
+
+- `initial_sponsor_group_id` - Initial sponsor group ID (required for agent identity).
+
+Type:
+
+```hcl
+object({
+    initial_sponsor_group_id = string
+  })
+```
+
+Default: `null`
+
+### <a name="input_agent_space_id"></a> [agent\_space\_id](#input\_agent\_space\_id)
+
+Description: The agent space ID referenced by the agent.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_connection_key"></a> [connection\_key](#input\_connection\_key)
+
+Description: The key for the incident management connection. Supplied as a write-only value so it is never persisted in state.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_connection_key_version"></a> [connection\_key\_version](#input\_connection\_key\_version)
+
+Description: Version tracker for `connection_key`. Increment to force the secret to be re-sent to Azure.
+
+Type: `number`
+
+Default: `null`
+
+### <a name="input_connection_string"></a> [connection\_string](#input\_connection\_string)
+
+Description: The connection string for the Application Insights resource. Supplied as a write-only value so it is never persisted in state.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_connection_string_version"></a> [connection\_string\_version](#input\_connection\_string\_version)
+
+Description: Version tracker for `connection_string`. Increment to force the secret to be re-sent to Azure.
+
+Type: `number`
+
+Default: `null`
+
+### <a name="input_default_model"></a> [default\_model](#input\_default\_model)
+
+Description: Default AI model configuration for the agent.
+
+- `name` - Model name (e.g., gpt-5, claude-opus-4-5, claude-sonnet-4-5).
+- `provider` - AI provider name (e.g., MicrosoftFoundry, Anthropic).
+
+Type:
+
+```hcl
+object({
+    name     = optional(string)
+    provider = optional(string)
+  })
+```
+
+Default: `null`
 
 ### <a name="input_enable_telemetry"></a> [enable\_telemetry](#input\_enable\_telemetry)
 
@@ -53,11 +168,240 @@ Type: `bool`
 
 Default: `true`
 
+### <a name="input_ignore_body_changes"></a> [ignore\_body\_changes](#input\_ignore\_body\_changes)
+
+Description: A set of `body` paths whose changes should be ignored, keyed by the module's AzAPI resource. Paths use dot notation (for example `properties.upgradeChannel`). Changes take effect only after an apply because the value is stored in provider-private state.
+
+- `app_agents` - Paths to ignore on the `Microsoft.App/agents` resource.
+
+Type:
+
+```hcl
+object({
+    app_agents = optional(list(string), [])
+  })
+```
+
+Default: `{}`
+
+### <a name="input_incident_management_configuration"></a> [incident\_management\_configuration](#input\_incident\_management\_configuration)
+
+Description: Incident management configuration. The secret `connection_key` is supplied separately through the write-only `connection_key` variable.
+
+- `connection_name` - The name of the connection.
+- `connection_url` - The URL of the connection.
+- `obo_user` - The user for the connection.
+- `type` - The type of incident management system.
+
+Type:
+
+```hcl
+object({
+    connection_name = optional(string)
+    connection_url  = optional(string)
+    obo_user        = optional(string)
+    type            = optional(string)
+  })
+```
+
+Default: `null`
+
+### <a name="input_knowledge_graph_configuration"></a> [knowledge\_graph\_configuration](#input\_knowledge\_graph\_configuration)
+
+Description: Knowledge graph configuration for the agent.
+
+- `identity` - The identity used to access the knowledge graph.
+- `managed_resources` - The list of resource IDs managed by the agent.
+
+Type:
+
+```hcl
+object({
+    identity          = optional(string)
+    managed_resources = optional(list(string))
+  })
+```
+
+Default: `null`
+
+### <a name="input_lock"></a> [lock](#input\_lock)
+
+Description: Controls the Resource Lock configuration for this resource. The following properties can be specified:
+
+- `kind` - (Required) The type of lock. Possible values are `CanNotDelete` and `ReadOnly`.
+- `name` - (Optional) The name of the lock. If not specified, a name will be generated based on the `kind` value. Changing this forces the creation of a new resource.
+- `notes` - (Optional) Notes about the lock. Maps to `Microsoft.Authorization/locks.properties.notes`.
+
+Type:
+
+```hcl
+object({
+    kind  = string
+    name  = optional(string, null)
+    notes = optional(string, null)
+  })
+```
+
+Default: `null`
+
+### <a name="input_log_configuration"></a> [log\_configuration](#input\_log\_configuration)
+
+Description: Log configuration. The secret Application Insights `connection_string` is supplied separately through the write-only `connection_string` variable.
+
+- `application_insights_configuration` - Application Insights configuration.
+  - `app_id` - The Application ID for the Application Insights resource.
+
+Type:
+
+```hcl
+object({
+    application_insights_configuration = optional(object({
+      app_id = optional(string)
+    }))
+  })
+```
+
+Default: `null`
+
+### <a name="input_managed_identities"></a> [managed\_identities](#input\_managed\_identities)
+
+Description: Controls the Managed Identity configuration on this resource.
+
+- `system_assigned` - (Optional) Specifies if the System Assigned Managed Identity should be enabled.
+- `user_assigned_resource_ids` - (Optional) Specifies a list of User Assigned Managed Identity resource IDs to be assigned to this resource.
+
+Type:
+
+```hcl
+object({
+    system_assigned            = optional(bool, false)
+    user_assigned_resource_ids = optional(set(string), [])
+  })
+```
+
+Default: `{}`
+
+### <a name="input_resource_types"></a> [resource\_types](#input\_resource\_types)
+
+Description: The AzAPI resource type (including API version) for each resource the module manages. Override to target a specific API version or a sovereign cloud.
+
+- `app_agents` - The resource type for the SRE Agent. Defaults to `Microsoft.App/agents@2026-01-01`.
+- `authorization_locks` - The resource type for the management lock. Defaults to `Microsoft.Authorization/locks@2020-05-01`.
+
+Type:
+
+```hcl
+object({
+    app_agents          = optional(string, "Microsoft.App/agents@2026-01-01")
+    authorization_locks = optional(string, "Microsoft.Authorization/locks@2020-05-01")
+  })
+```
+
+Default: `{}`
+
+### <a name="input_retry"></a> [retry](#input\_retry)
+
+Description: Retry configuration applied to the AzAPI resource. Defaults to `null` (no custom retry).
+
+- `error_message_regex` - (Optional) A list of regex patterns matching error messages that trigger a retry.
+- `interval_seconds` - (Optional) Initial interval between retries in seconds.
+- `max_interval_seconds` - (Optional) Maximum interval between retries in seconds.
+
+Type:
+
+```hcl
+object({
+    error_message_regex  = optional(list(string))
+    interval_seconds     = optional(number)
+    max_interval_seconds = optional(number)
+  })
+```
+
+Default: `null`
+
+### <a name="input_role_assignment_definition_lookup_enabled"></a> [role\_assignment\_definition\_lookup\_enabled](#input\_role\_assignment\_definition\_lookup\_enabled)
+
+Description: Controls whether role definitions are looked up by name when creating role assignments. When disabled, every role assignment must supply `role_definition_id_or_name` as a full role definition resource ID.
+
+Type: `bool`
+
+Default: `true`
+
+### <a name="input_role_assignment_definition_scope"></a> [role\_assignment\_definition\_scope](#input\_role\_assignment\_definition\_scope)
+
+Description: The scope used to look up role definitions by name. Defaults to the SRE Agent resource ID when not set.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments)
+
+Description: A map of role assignments to create on the SRE Agent. The map key is deliberately arbitrary to avoid issues where map keys may be unknown at plan time.
+
+- `name` - (Optional) The name (a GUID) of the role assignment. A random UUID is generated when omitted.
+- `role_definition_id_or_name` - The ID or name of the role definition to assign to the principal.
+- `principal_id` - The ID of the principal to assign the role to.
+- `description` - (Optional) The description of the role assignment.
+- `skip_service_principal_aad_check` - (Optional) No effect when using AzAPI.
+- `condition` - (Optional) The condition which will be used to scope the role assignment.
+- `condition_version` - (Optional) The version of the condition syntax. Valid value is `2.0`.
+- `delegated_managed_identity_resource_id` - (Optional) The delegated Azure Resource ID which contains a Managed Identity. Used in cross-tenant scenarios.
+- `principal_type` - (Optional) The type of the `principal_id`. Possible values are `User`, `Group`, and `ServicePrincipal`.
+
+Type:
+
+```hcl
+map(object({
+    name                                   = optional(string, null)
+    role_definition_id_or_name             = string
+    principal_id                           = string
+    description                            = optional(string, null)
+    skip_service_principal_aad_check       = optional(bool, false)
+    condition                              = optional(string, null)
+    condition_version                      = optional(string, null)
+    delegated_managed_identity_resource_id = optional(string, null)
+    principal_type                         = optional(string, null)
+  }))
+```
+
+Default: `{}`
+
 ### <a name="input_tags"></a> [tags](#input\_tags)
 
-Description: A map of tags to assign to the resource group.
+Description: A map of tags to assign to the SRE Agent.
 
 Type: `map(string)`
+
+Default: `null`
+
+### <a name="input_timeouts"></a> [timeouts](#input\_timeouts)
+
+Description: Per-operation timeouts applied to the AzAPI resource. Defaults to `null` (provider defaults). Each value is a Go duration string (for example `30m`, `1h`).
+
+- `create` - (Optional) Timeout for create operations.
+- `read` - (Optional) Timeout for read operations.
+- `update` - (Optional) Timeout for update operations.
+- `delete` - (Optional) Timeout for delete operations.
+
+Type:
+
+```hcl
+object({
+    create = optional(string)
+    read   = optional(string)
+    update = optional(string)
+    delete = optional(string)
+  })
+```
+
+Default: `null`
+
+### <a name="input_upgrade_channel"></a> [upgrade\_channel](#input\_upgrade\_channel)
+
+Description: The upgrade channel of the agent. Possible values are `Preview` and `Stable`.
+
+Type: `string`
 
 Default: `null`
 
@@ -65,17 +409,35 @@ Default: `null`
 
 The following outputs are exported:
 
+### <a name="output_agent_endpoint"></a> [agent\_endpoint](#output\_agent\_endpoint)
+
+Description: The endpoint URL of the SRE Agent.
+
 ### <a name="output_name"></a> [name](#output\_name)
 
-Description: The name of the resource group.
+Description: The name of the SRE Agent.
+
+### <a name="output_resource"></a> [resource](#output\_resource)
+
+Description: The exported properties of the SRE Agent resource (as specified in response\_export\_values).
 
 ### <a name="output_resource_id"></a> [resource\_id](#output\_resource\_id)
 
-Description: The resource ID of the resource group.
+Description: The resource ID of the SRE Agent.
+
+### <a name="output_system_assigned_mi_principal_id"></a> [system\_assigned\_mi\_principal\_id](#output\_system\_assigned\_mi\_principal\_id)
+
+Description: The principal ID of the system-assigned managed identity, if enabled.
 
 ## Modules
 
-No modules.
+The following Modules are called:
+
+### <a name="module_role_assignments_interface"></a> [role\_assignments\_interface](#module\_role\_assignments\_interface)
+
+Source: Azure/avm-utl-interfaces/azure
+
+Version: 0.9.0
 
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection
