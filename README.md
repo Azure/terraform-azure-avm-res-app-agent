@@ -102,14 +102,6 @@ object({
 
 Default: `null`
 
-### <a name="input_agent_space_id"></a> [agent\_space\_id](#input\_agent\_space\_id)
-
-Description: The agent space ID referenced by the agent.
-
-Type: `string`
-
-Default: `null`
-
 ### <a name="input_connection_key"></a> [connection\_key](#input\_connection\_key)
 
 Description: The key for the incident management connection. Supplied as a write-only value so it is never persisted in state.

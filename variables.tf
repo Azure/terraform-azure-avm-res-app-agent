@@ -58,12 +58,6 @@ Agent identity configuration for accessing resources.
 DESCRIPTION
 }
 
-variable "agent_space_id" {
-  type        = string
-  default     = null
-  description = "The agent space ID referenced by the agent."
-}
-
 variable "connection_key" {
   type        = string
   default     = null
