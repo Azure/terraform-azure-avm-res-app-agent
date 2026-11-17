@@ -1,6 +1,8 @@
-# Terraform Azure Verified Module template
+# terraform-azure-avm-res-app-agent
 
-This minimal AzAPI module template creates one Azure resource group.
+This Azure Verified Module deploys an Azure SRE Agent (`Microsoft.App/agents`) using the AzAPI provider.
+
+The module supports a system-assigned or user-assigned managed identity, role assignments, a resource lock, incident management, knowledge graph, log and action configuration, and a default model selection. The parent resource group must already exist and is supplied through `parent_id`.
 
 ## Telemetry
 
