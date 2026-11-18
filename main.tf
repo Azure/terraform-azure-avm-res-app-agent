@@ -13,7 +13,6 @@ resource "azapi_resource" "this" {
       agentIdentity = var.agent_identity == null ? null : {
         initialSponsorGroupId = var.agent_identity.initial_sponsor_group_id
       }
-      agentSpaceId = var.agent_space_id
       defaultModel = var.default_model == null ? null : {
         name     = var.default_model.name
         provider = var.default_model.provider

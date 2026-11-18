@@ -29,6 +29,10 @@ override.tf.json
 # Ignore Terraform lock file
 .terraform.lock.hcl
 
+# Ignore .env files created by lifecycle hooks
+.env
+**/.env
+
 # Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
 # example: *tfplan*
 

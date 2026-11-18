@@ -1,3 +1,3 @@
 # Default example
 
-This deploys the module in its simplest form.
+This deploys an Azure SRE Agent with a system-assigned managed identity into a new resource group.
